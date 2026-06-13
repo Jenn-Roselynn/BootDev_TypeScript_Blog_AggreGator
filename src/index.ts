@@ -1,6 +1,6 @@
 import { setUser } from "./config.js";
 import { CommandsRegistry, registerCommand, runCommand } from "./commands.js";
-import { createUser, getUserByName } from "./db/users.js";
+import { createUser, getUserByName, deleteAllUsers } from "./db/users.js";
 
 async function handlerLogin(cmdName: string, ...args: string[]): Promise<void> {
   if (args.length === 0 || !args[0]) {
@@ -9,7 +9,6 @@ async function handlerLogin(cmdName: string, ...args: string[]): Promise<void> {
 
   const username = args[0];
   
-  // Verify user exists in database before allowing authentication
   const existingUser = await getUserByName(username);
   if (!existingUser) {
     throw new Error(`User account '${username}' does not exist.`);
@@ -26,7 +25,6 @@ async function handlerRegister(cmdName: string, ...args: string[]): Promise<void
 
   const username = args[0];
 
-  // Prevent creation of duplicate usernames
   const existingUser = await getUserByName(username);
   if (existingUser) {
     throw new Error(`The username '${username}' is already taken.`);
@@ -39,11 +37,17 @@ async function handlerRegister(cmdName: string, ...args: string[]): Promise<void
   console.log(JSON.stringify(newUser, null, 2));
 }
 
+async function handlerReset(cmdName: string, ...args: string[]): Promise<void> {
+  await deleteAllUsers();
+  console.log("Database has been successfully reset to a blank state.");
+}
+
 async function main() {
   const registry: CommandsRegistry = {};
 
   registerCommand(registry, "login", handlerLogin);
   registerCommand(registry, "register", handlerRegister);
+  registerCommand(registry, "reset", handlerReset);
 
   const rawArgs = process.argv.slice(2);
 
