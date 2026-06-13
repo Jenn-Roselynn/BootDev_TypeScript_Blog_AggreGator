@@ -1,6 +1,6 @@
-import { setUser } from "./config.js";
+import { readConfig, setUser } from "./config.js";
 import { CommandsRegistry, registerCommand, runCommand } from "./commands.js";
-import { createUser, getUserByName, deleteAllUsers } from "./db/users.js";
+import { createUser, getUserByName, deleteAllUsers, getUsers } from "./db/users.js";
 
 async function handlerLogin(cmdName: string, ...args: string[]): Promise<void> {
   if (args.length === 0 || !args[0]) {
@@ -42,12 +42,27 @@ async function handlerReset(cmdName: string, ...args: string[]): Promise<void> {
   console.log("Database has been successfully reset to a blank state.");
 }
 
+async function handlerUsers(cmdName: string, ...args: string[]): Promise<void> {
+  const allUsers = await getUsers();
+  const currentConfig = readConfig();
+  const currentUsername = currentConfig.currentUserName;
+
+  for (const user of allUsers) {
+    if (user.name === currentUsername) {
+      console.log(`* ${user.name} (current)`);
+    } else {
+      console.log(`* ${user.name}`);
+    }
+  }
+}
+
 async function main() {
   const registry: CommandsRegistry = {};
 
   registerCommand(registry, "login", handlerLogin);
   registerCommand(registry, "register", handlerRegister);
   registerCommand(registry, "reset", handlerReset);
+  registerCommand(registry, "users", handlerUsers);
 
   const rawArgs = process.argv.slice(2);
 
