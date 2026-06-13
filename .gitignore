@@ -6,6 +6,12 @@ jspm_packages/
 dist/
 out/
 
+# Exclude compiled JS files generated from TS files in the src folder
+# This keeps our TypeScript source clean if we run an in-place compile
+src/**/*.js
+src/**/*.d.ts
+src/**/*.js.map
+
 # Local configuration files and environment secrets
 .env
 .env.local
