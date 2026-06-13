@@ -15,6 +15,13 @@
       "when": 1781330552271,
       "tag": "0001_dapper_fantastic_four",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781331282318,
+      "tag": "0002_ambiguous_harrier",
+      "breakpoints": true
     }
   ]
 }
