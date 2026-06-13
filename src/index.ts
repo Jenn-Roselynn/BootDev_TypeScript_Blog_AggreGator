@@ -1,7 +1,25 @@
 import { readConfig, setUser } from "./config.js";
 import { CommandsRegistry, registerCommand, runCommand } from "./commands.js";
+import { users, feeds } from "./db/schema.js";
 import { createUser, getUserByName, deleteAllUsers, getUsers } from "./db/users.js";
+import { createFeed } from "./db/feeds.js";
 import { fetchFeed } from "./rss.js";
+
+type User = typeof users.$inferSelect;
+type Feed = typeof feeds.$inferSelect;
+
+function printFeed(feed: Feed, user: User): void {
+  console.log("Feed successfully added!");
+  console.log(JSON.stringify({
+    id: feed.id,
+    createdAt: feed.createdAt,
+    updatedAt: feed.updatedAt,
+    name: feed.name,
+    url: feed.url,
+    userId: feed.userId,
+    user_name: user.name
+  }, null, 2));
+}
 
 async function handlerLogin(cmdName: string, ...args: string[]): Promise<void> {
   if (args.length === 0 || !args[0]) {
@@ -63,6 +81,30 @@ async function handlerAgg(cmdName: string, ...args: string[]): Promise<void> {
   console.log(JSON.stringify(feedData, null, 2));
 }
 
+async function handlerAddFeed(cmdName: string, ...args: string[]): Promise<void> {
+  if (args.length < 2 || !args[0] || !args[1]) {
+    throw new Error("The addfeed command requires both a name and a url parameter.");
+  }
+
+  const feedName = args[0];
+  const feedURL = args[1];
+
+  const currentConfig = readConfig();
+  const currentUsername = currentConfig.currentUserName;
+
+  if (!currentUsername) {
+    throw new Error("No user currently logged in. Run 'login' or 'register' first.");
+  }
+
+  const currentUser = await getUserByName(currentUsername);
+  if (!currentUser) {
+    throw new Error(`The currently configured user '${currentUsername}' was not found in the database.`);
+  }
+
+  const newFeed = await createFeed(feedName, feedURL, currentUser.id);
+  printFeed(newFeed, currentUser);
+}
+
 async function main() {
   const registry: CommandsRegistry = {};
 
@@ -71,6 +113,7 @@ async function main() {
   registerCommand(registry, "reset", handlerReset);
   registerCommand(registry, "users", handlerUsers);
   registerCommand(registry, "agg", handlerAgg);
+  registerCommand(registry, "addfeed", handlerAddFeed);
 
   const rawArgs = process.argv.slice(2);
 
