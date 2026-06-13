@@ -1,0 +1,25 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# TypeScript compilation output
+dist/
+out/
+
+# Local configuration files and environment secrets
+.env
+.env.local
+.env.*.local
+.gatorconfig.json
+*.local.json
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log
+
+# Operating System files
+.DS_Store
+Thumbs.db
