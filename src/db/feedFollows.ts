@@ -1,6 +1,6 @@
 import { db } from "./index.js";
 import { feedFollows, feeds, users } from "./schema.js";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export async function createFeedFollow(userId: string, feedId: string) {
   const [newFollow] = await db
@@ -11,7 +11,6 @@ export async function createFeedFollow(userId: string, feedId: string) {
     })
     .returning();
 
-  // Now join to get the requested metadata
   const [result] = await db
     .select({
       id: feedFollows.id,
@@ -41,4 +40,26 @@ export async function getFeedFollowsForUser(userId: string) {
     .innerJoin(feeds, eq(feedFollows.feedId, feeds.id))
     .innerJoin(users, eq(feedFollows.userId, users.id))
     .where(eq(feedFollows.userId, userId));
+}
+
+export async function deleteFeedFollow(userId: string, feedUrl: string) {
+  // First, find the feed to get the feedId
+  const [feed] = await db
+    .select()
+    .from(feeds)
+    .where(eq(feeds.url, feedUrl));
+
+  if (!feed) {
+    throw new Error(`Feed with URL ${feedUrl} not found.`);
+  }
+
+  // Delete the junction record
+  await db
+    .delete(feedFollows)
+    .where(
+      and(
+        eq(feedFollows.userId, userId),
+        eq(feedFollows.feedId, feed.id)
+      )
+    );
 }

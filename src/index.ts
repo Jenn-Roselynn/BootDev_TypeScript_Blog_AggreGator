@@ -2,8 +2,8 @@ import { readConfig, setUser } from "./config.js";
 import { CommandsRegistry, registerCommand, runCommand, CommandHandler } from "./commands.js";
 import { users, feeds } from "./db/schema.js";
 import { createUser, getUserByName, deleteAllUsers, getUsers } from "./db/users.js";
-import { createFeed, getFeeds, getFeedByUrl } from "./db/feeds.js";
-import { createFeedFollow, getFeedFollowsForUser } from "./db/feedFollows.js";
+import { createFeed, getFeeds, getFeedByUrl, markFeedFetched, getNextFeedToFetch } from "./db/feeds.js";
+import { createFeedFollow, getFeedFollowsForUser, deleteFeedFollow } from "./db/feedFollows.js";
 import { fetchFeed } from "./rss.js";
 
 type User = typeof users.$inferSelect;
@@ -33,6 +33,40 @@ const middlewareLoggedIn: middlewareLoggedIn = (handler) => {
     await handler(cmdName, currentUser, ...args);
   };
 };
+
+function parseDuration(durationStr: string): number {
+  const regex = /^(\d+)(ms|s|m|h)$/;
+  const match = durationStr.match(regex);
+  if (!match) {
+    throw new Error("Invalid duration format. Use e.g., 1s, 1m, 1h.");
+  }
+  const val = parseInt(match[1], 10);
+  const unit = match[2];
+  switch (unit) {
+    case "ms": return val;
+    case "s": return val * 1000;
+    case "m": return val * 60 * 1000;
+    case "h": return val * 60 * 60 * 1000;
+    default: return val;
+  }
+}
+
+async function scrapeFeeds() {
+  const feed = await getNextFeedToFetch();
+  if (!feed) {
+    console.log("No feeds found to fetch.");
+    return;
+  }
+
+  console.log(`Fetching feed: ${feed.name}`);
+  const feedData = await fetchFeed(feed.url);
+
+  await markFeedFetched(feed.id);
+
+  for (const item of feedData.channel.item) {
+    console.log(`* ${item.title}`);
+  }
+}
 
 function printFeed(feed: Feed, user: User): void {
   console.log("Feed successfully added!");
@@ -102,9 +136,28 @@ async function handlerUsers(cmdName: string, ...args: string[]): Promise<void> {
 }
 
 async function handlerAgg(cmdName: string, ...args: string[]): Promise<void> {
-  const targetURL = "https://www.wagslane.dev/index.xml";
-  const feedData = await fetchFeed(targetURL);
-  console.log(JSON.stringify(feedData, null, 2));
+  if (args.length === 0 || !args[0]) {
+    throw new Error("The agg command requires a time_between_reqs duration (e.g., 1m).");
+  }
+
+  const durationStr = args[0];
+  const timeBetweenRequests = parseDuration(durationStr);
+  console.log(`Collecting feeds every ${durationStr}`);
+
+  const handleError = (err: any) => console.error(`Error scraping feed: ${err.message}`);
+
+  scrapeFeeds().catch(handleError);
+  const interval = setInterval(() => {
+    scrapeFeeds().catch(handleError);
+  }, timeBetweenRequests);
+
+  await new Promise<void>((resolve) => {
+    process.on("SIGINT", () => {
+      console.log("Shutting down feed aggregator...");
+      clearInterval(interval);
+      resolve();
+    });
+  });
 }
 
 async function handlerAddFeed(cmdName: string, user: User, ...args: string[]): Promise<void> {
@@ -144,6 +197,16 @@ async function handlerFollow(cmdName: string, user: User, ...args: string[]): Pr
   console.log(`User '${follow.userName}' is now following feed '${follow.feedName}'`);
 }
 
+async function handlerUnfollow(cmdName: string, user: User, ...args: string[]): Promise<void> {
+  if (args.length === 0 || !args[0]) {
+    throw new Error("The unfollow command requires a feed URL.");
+  }
+
+  const url = args[0];
+  await deleteFeedFollow(user.id, url);
+  console.log(`User '${user.name}' has unfollowed the feed at '${url}'`);
+}
+
 async function handlerFollowing(cmdName: string, user: User, ...args: string[]): Promise<void> {
   const follows = await getFeedFollowsForUser(user.id);
   for (const follow of follows) {
@@ -162,6 +225,7 @@ async function main() {
   registerCommand(registry, "addfeed", middlewareLoggedIn(handlerAddFeed));
   registerCommand(registry, "feeds", handlerFeeds);
   registerCommand(registry, "follow", middlewareLoggedIn(handlerFollow));
+  registerCommand(registry, "unfollow", middlewareLoggedIn(handlerUnfollow));
   registerCommand(registry, "following", middlewareLoggedIn(handlerFollowing));
 
   const rawArgs = process.argv.slice(2);
