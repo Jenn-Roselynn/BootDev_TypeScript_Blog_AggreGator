@@ -21,7 +21,7 @@ To get Gator up and running, make sure you have the following installed on your 
 
 1. **Clone the repository:**
    ```bash
-   git clone [https://github.com/Jenn-Roselynn/BootDev_TypeScript_Blog_AggreGator.git](https://github.com/Jenn-Roselynn/BootDev_TypeScript_Blog_AggreGator.git)
+   git clone https://github.com/Jenn-Roselynn/BootDev_TypeScript_Blog_AggreGator.git
    cd gator
    ```
 
