@@ -4,6 +4,7 @@ import { users, feeds } from "./db/schema.js";
 import { createUser, getUserByName, deleteAllUsers, getUsers } from "./db/users.js";
 import { createFeed, getFeeds, getFeedByUrl, markFeedFetched, getNextFeedToFetch } from "./db/feeds.js";
 import { createFeedFollow, getFeedFollowsForUser, deleteFeedFollow } from "./db/feedFollows.js";
+import { createPost, getPostsForUser } from "./db/queries.js";
 import { fetchFeed } from "./rss.js";
 
 type User = typeof users.$inferSelect;
@@ -64,7 +65,13 @@ async function scrapeFeeds() {
   await markFeedFetched(feed.id);
 
   for (const item of feedData.channel.item) {
-    console.log(`* ${item.title}`);
+    await createPost({
+      title: item.title ?? "Untitled",
+      url: item.link ?? "",
+      description: item.description ?? null,
+      publishedAt: item.pubDate ? new Date(item.pubDate) : null,
+      feedId: feed.id,
+    });
   }
 }
 
@@ -214,6 +221,18 @@ async function handlerFollowing(cmdName: string, user: User, ...args: string[]):
   }
 }
 
+async function handlerBrowse(cmdName: string, user: User, ...args: string[]): Promise<void> {
+  const limit = args.length > 0 ? parseInt(args[0], 10) : 2;
+  const posts = await getPostsForUser(user.id, limit);
+
+  for (const post of posts) {
+    console.log(`--- ${post.title} ---`);
+    console.log(`Source: ${post.feedName}`);
+    console.log(`URL: ${post.url}`);
+    console.log("");
+  }
+}
+
 async function main() {
   const registry: CommandsRegistry = {};
 
@@ -227,6 +246,7 @@ async function main() {
   registerCommand(registry, "follow", middlewareLoggedIn(handlerFollow));
   registerCommand(registry, "unfollow", middlewareLoggedIn(handlerUnfollow));
   registerCommand(registry, "following", middlewareLoggedIn(handlerFollowing));
+  registerCommand(registry, "browse", middlewareLoggedIn(handlerBrowse));
 
   const rawArgs = process.argv.slice(2);
 
